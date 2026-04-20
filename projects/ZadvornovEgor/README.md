@@ -8,30 +8,28 @@
 
 | Блок | Директория | Описание |
 |------|-----------|----------|
-| 1. PROJECTCLONE | [PROJECTCLONE/](PROJECTCLONE/) | Клон-анализ Gamma.app -- форк SlideDeck AI + аналитическое сравнение 5 open-source решений |
+| 1. OpenClaw | [OpenClaw/](OpenClaw/) | ПрофиАссистент -- AI-ассистент для репетиторов на Profi.ru. Архитектура, отчет, продукт, план, AJTBD |
 | 2. PERSONAL | [PERSONAL/](PERSONAL/) | Personal AI OS -- 10 скиллов Claude Code, которые производят реальные проектные артефакты |
-| 3. OpenClaw | [OpenClaw/](OpenClaw/) | ПрофиАссистент -- AI-ассистент для репетиторов на Profi.ru. Архитектура, отчет, продукт, план, AJTBD |
+| 3. PROJECTCLONE | [PROJECTCLONE/](PROJECTCLONE/) | Клон Gamma.app -- MVP генератора AI-презентаций + аналитическое сравнение 5 open-source решений |
 | 4. BONUS | [bonus/](bonus/) | Clone Pipeline -- 6 переиспользуемых скиллов для систематического клонирования GenAI-продуктов |
 
 ---
 
-## Рекурсивное доказательство
+## Dogfooding: как это было сделано
 
-Эта работа создана с помощью системы, описанной в Блоке 2.
+Эта работа создана с помощью системы, описанной в Блоке 2. 9 из 10 скиллов использовались при подготовке:
 
-Скиллы Personal AI OS использовались на каждом этапе подготовки:
-
-- `/think-through` -- спланировал структуру домашки и порядок выполнения блоков
-- `/market-research` -- конкурентный анализ Gamma.app и 5 open-source аналогов (Блок 1)
-- `/cddc-canvas` -- валидация продуктовых гипотез для ПрофиАссистента (Блок 3)
-- `/tsa-progon` -- синтетический CustDev по 5 сегментам репетиторов (Блок 3, AJTBD)
-- `/product-pipeline` -- полный pipeline продуктового анализа для OpenClaw (Блок 3)
-- `/skill-creator` -- генерация 6 бонусных скиллов clone-pipeline (Блок 4)
-- `/de-ai-ify` -- очистка всех текстов от AI-маркеров
-- `/senior-prompt-engineer` -- оптимизация промптов для всех AI-взаимодействий
-- `/code-reviewer` -- quality gates для всех сгенерированных артефактов
-
-Инструменты создали артефакты. Артефакты демонстрируют инструменты. Это и есть рекурсивное доказательство: система доказывает свою работоспособность тем, что производит работу, которую вы сейчас читаете.
+| Артефакт | Скилл | Доказательство |
+|----------|-------|----------------|
+| Струк��ура и план домашки | `/think-through` | Этот README |
+| 5 AJTBD-сегментов | `/tsa-progon` | [OpenClaw/AJTBD.md](OpenClaw/AJTBD.md) |
+| Пивот монетизации 7500 -> гибрид | `/cddc-canvas` | [OpenClaw/REPORT.md](OpenClaw/REPORT.md), решение #3 |
+| Продуктовый анализ OpenClaw | `/product-pipeline` | [OpenClaw/PRODUCT.md](OpenClaw/PRODUCT.md) |
+| Конкурентный анализ Gamma + 20 аналогов | `/market-research` | [PROJECTCLONE/README.md](PROJECTCLONE/README.md), секция 5 |
+| 6 clone-pipeline скиллов | `/skill-creator` | [bonus/skills/](bonus/skills/) |
+| Промпты для AI-генерации | `/senior-prompt-engineer` | PROJECTCLONE/gamma-clone/prompts.py |
+| Quality gates артефактов | `/code-reviewer` | Аудит всех файлов перед коммитом |
+| Очистка текстов от AI-маркеров | `/de-ai-ify` | Все markdown-файлы |
 
 ---
 

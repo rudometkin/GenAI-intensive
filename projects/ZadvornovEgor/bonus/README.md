@@ -57,21 +57,21 @@ Each phase can be re-entered independently. If testing reveals issues, loop back
 
 ## Applied Example: Gamma.app Clone
 
-This pipeline was applied in the homework to analyze and partially clone Gamma.app:
+В рамках домашки пайплайн был применен в фазах 1-3 (Discovery, Analysis, Spec). Фазы 4-6 описаны как методология для будущих проектов.
 
-1. **Discovery** -- compared 20+ AI presentation tools (Gamma, Beautiful.ai, Tome, SlidesAI, Decktopus, Pitch, Canva AI, etc.). Gamma.app scored highest on market fit + moderate complexity.
-2. **Analysis** -- Playwright walkthrough of Gamma.app captured 12 screens, identified React + Next.js frontend, Python backend, GPT-4 for generation. Mapped 34 API endpoints.
-3. **Spec** -- wrote TZ for "SlideDeck AI" with 18 MVP features, 22 API endpoints, 6 database tables, acceptance criteria per feature.
-4. **Implementation** -- scaffolded Next.js + FastAPI project, implemented core generation flow with Gemini API.
-5. **Testing** -- unit tests, E2E flows, visual comparison showing 85% fidelity to original.
-6. **Deployment** -- Docker containerization, GitHub Actions CI/CD, production deployment plan.
+1. **Discovery** -- через `/ai-search-free` сравнили 20+ AI-инструментов для презентаций. Gamma.app -- лучший по market fit + умере��ной сложности. Выбрали SlideDeck AI (346 stars, MIT, Python) как open-source базу.
+2. **Analysis** -- агент `code-reviewer` провел аудит кода SlideDeck AI: структура, зависимости, безопасность. `/senior-architect` разобрал архитектуру: Streamlit UI, LiteLLM backend, python-pptx renderer.
+3. **Spec** -- составлена таблица сравнения 5 решений по 6 критериям, декомпозиция на продуктовые модули, анализ рвов Gamma.app.
+4. **Implementation** -- (методология) scaffolding + MVP из спецификации.
+5. **Testing** -- (методология) unit + E2E + визуальное сравнение с оригиналом.
+6. **Deployment** -- (методология) контейнеризация + CI/CD + мониторинг.
 
 ## Key Principles
 
 - **Clone to learn, not to steal** -- the goal is understanding architecture patterns and building skills, not IP theft
 - **MVP first** -- clone the core value prop (20% of features that deliver 80% of value), skip the rest
 - **Open-source when possible** -- prefer targets with visible codebases for deeper analysis
-- **AI-native** -- every phase leverages AI tools (web search, code analysis, generation, testing)
+- **AI-native** -- every phase uses AI tools (web search, code analysis, generation, testing)
 
 ## Meta
 

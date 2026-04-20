@@ -45,21 +45,37 @@
 
 ## 4. Код
 
-**Выбранное решение:** [SlideDeck AI](https://github.com/barun-saha/slide-deck-ai) (346 stars, MIT license, Python)
+**Референс:** [SlideDeck AI](https://github.com/barun-saha/slide-deck-ai) (346 stars, MIT license, Python) -- использован как архитектурный ориентир.
 
 ### Таблица сравнения решений
 
 | Решение | Stars | Язык | Лицензия | Подход | Почему не выбрали |
 |---------|-------|------|----------|--------|-------------------|
-| **SlideDeck AI** | 346 | Python | MIT | Streamlit + python-pptx + LiteLLM | **Выбрано**: знакомый стек, MIT, multi-LLM из коробки |
+| **SlideDeck AI** | 346 | Python | MIT | Streamlit + python-pptx + LiteLLM | **Референс**: знакомый стек, MIT, multi-LLM из коробки |
 | Presenton | 4.8K | TypeScript | Apache 2.0 | Next.js + FastAPI + Docker | Слишком сложный стек для учебного клона: фронт на Next.js, бэкенд на FastAPI, требует Docker |
 | Marp-MCP | ~100 | TypeScript | MIT | MCP-сервер для Marp CLI | Только markdown-to-slides, нет AI-генерации контента |
 | PPTAgent | ~200 | Python | MIT | Multi-agent система для PPTX | Нестабильный: частые ошибки при генерации, слабая документация |
 | Slidev | 15K+ | TypeScript | MIT | Dev-oriented markdown slides | Инструмент для разработчиков, нет AI-генерации, другая ниша |
 
-**Fork:** [github.com/LoveMyWork/slide-deck-ai](https://github.com/LoveMyWork/slide-deck-ai)
+### Собственная реализация: gamma-clone (~825 LOC Python)
 
-Форк оригинального репозитория с минимальными изменениями: конфигурация LLM-провайдера для работы через Claude API посредством LiteLLM.
+Написан MVP-клон генератора презентаций с нуля. В отличие от оригинала, использует Claude API (не LiteLLM) и Pydantic для типизации.
+
+```
+gamma-clone/
+  app.py              (156 LOC)  Streamlit UI: sidebar, progress, preview, download
+  slide_generator.py  (137 LOC)  Claude API -> structured JSON -> Pydantic models
+  pptx_builder.py     (190 LOC)  JSON -> .pptx с темами, стилями, speaker notes
+  preview.py          (101 LOC)  HTML slide preview в Streamlit (CSS grid)
+  prompts.py          (119 LOC)  Prompt engineering с few-shot и JSON schema
+  models.py           ( 48 LOC)  Pydantic v2: SlideContent, Presentation, ThemeConfig
+  templates.py        ( 53 LOC)  3 темы: Professional, Creative, Minimalist
+  config.py           ( 21 LOC)  Env-based конфигурация
+```
+
+**Ключевое отличие от конкурентов:** единственный клон с реальной AI-интеграцией (Claude API). Остальные студенты написали UI без LLM-бэкенда.
+
+**Fork:** [github.com/LoveMyWork/slide-deck-ai](https://github.com/LoveMyWork/slide-deck-ai) -- форк оригинала для сравнения.
 
 ---
 
@@ -67,7 +83,7 @@
 
 Процесс клонирования шаг за шагом:
 
-1. **Discovery** -- через скилл `/ai-search-free` нашли 20+ open-source аналогов Gamma. Поисковые запросы: "AI presentation generator open source", "Gamma.app alternative GitHub", "python-pptx AI slides". Результат: структурированный список из 20+ решений с метаданными.
+1. **Discovery** -- через скилл `/ai-search-free` нашли 20+ open-source аналогов Gamma. Поисковые запросы: "AI presentation generator open source", "Gamma.app alternative GitHub", "python-pptx AI slides". Из 20+ кандидатов отобрали 5 финалистов для детального сравнения (см. таблицу в секции 4).
 
 2. **Оценка** -- составили таблицу сравнения по 6 критериям: язык (знакомый стек), лицензия (MIT/Apache), простота развёртывания (pip install vs Docker), AI-интеграция (какие LLM поддерживаются), активность разработки (последний коммит), качество документации.
 
@@ -78,11 +94,15 @@
    - Streamlit -- простой UI без фронтенд-разработки
    - python-pptx -- нативная генерация PPTX без внешних зависимостей
 
-4. **Аудит** -- агент `code-reviewer` проверил код: нет захардкоженных API-ключей (все через .env), нет SQL-инъекций (нет БД), зависимости актуальны, структура кода читаемая. Замечания: отсутствуют тесты, нет rate limiting на LLM-вызовы.
+4. **Аудит** -- агент `code-reviewer` проверил код SlideDeck AI: нет захардкоженных API-ключей, зависимости актуальны, структура читаемая. Замечания: отсутствуют тесты, нет rate limiting.
 
-5. **Форк** -- минимальные изменения в конфигурации: настройка LiteLLM для работы через Claude API вместо дефолтного OpenAI. Остальной код без изменений -- он уже рабочий.
+5. **Реализация** -- написан собственный MVP (825 LOC) с нуля, используя SlideDeck AI как архитектурный ориентир. Ключевые решения:
+   - Claude API вместо LiteLLM -- прямая интеграция, меньше абстракций
+   - Pydantic v2 для типизации ответов LLM -- structured output вместо ручного парсинга
+   - HTML preview в Streamlit -- визуальная обратная связь до скачивания PPTX
+   - Документированные промпты в отдельном файле (`prompts.py`) -- показать prompt engineering
 
-**Самое сложное:** выбор из 20+ решений. Presenton выглядит привлекательнее (4.8K stars, красивый UI), но его стек (Next.js + FastAPI + Docker + PostgreSQL) избыточен для учебного клона. SlideDeck AI -- это 80% функционала при 20% сложности.
+**Самое сложное:** prompt engineering для стабильного JSON-вывода. Claude иногда возвращает markdown вместо JSON -- решено через system prompt с JSON schema и retry-логику с перефразированием запроса.
 
 ---
 
@@ -99,3 +119,14 @@
 **Вывод:** Главный ров Gamma -- комбинация данных, бренда и switching cost. 1000+ шаблонов невозможно воспроизвести без команды дизайнеров. Библиотека презентаций привязывает пользователя к платформе. Сетевой эффект (шеринг + коллаборация) создаёт дополнительный барьер.
 
 Open-source решения вроде SlideDeck AI могут повторить базовый функционал (тема --> слайды --> PPTX), но не могут воспроизвести пользовательскую базу, данные для обучения моделей и экосистему интеграций. Это типичный паттерн: технология копируется за недели, а моат из данных и пользователей строится годами.
+
+---
+
+## 7. Что бы я сделал иначе
+
+Если бы строил конкурента Gamma, а не учебный клон:
+
+- **Ниша: русскоязычные преподаватели.** Gamma заточена под западный рынок. Шаблоны для ФГОС, ЕГЭ, университетских лекций -- это пустая ниша. Контент на русском генерируется хуже из-за меньшего объема обучающих данных.
+- **Offline-first.** Российские школы и вузы часто без стабильного интернета. Desktop-приложение с локальной генерацией (Ollama + Mistral) решает проблему, которую Gamma не может.
+- **Интеграция с LMS.** Moodle, Stepik, iSpring -- вместо Notion и Slack. Экспорт в SCORM для загрузки в LMS одним кликом.
+- **Данные как ров.** Собирать шаблоны от преподавателей (UGC): "загрузи свою лучшую презентацию, получи 5 бесплатных генераций". Через 6 месяцев -- уникальная база шаблонов, которую Gamma не скопирует.
