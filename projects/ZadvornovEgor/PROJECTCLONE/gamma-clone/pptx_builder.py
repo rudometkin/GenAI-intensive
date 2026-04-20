@@ -70,8 +70,7 @@ def _add_title_slide(
     sub_p.alignment = PP_ALIGN.CENTER
 
     # Speaker notes
-    if slide.has_notes_slide:
-        slide.notes_slide.notes_text_frame.text = subtitle
+    slide.notes_slide.notes_text_frame.text = subtitle
 
 
 def _add_content_slide(
