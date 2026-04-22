@@ -1,172 +1,184 @@
-# LEGO DUPLO Sorting Machine
+# Автоматизированная система сортировки деталей LEGO DUPLO
 
-Automated system for sorting LEGO DUPLO bricks by type using computer vision.
-
----
-
-## Overview
-
-The project implements a hardware-software complex capable of identifying LEGO DUPLO bricks on a conveyor belt and routing them to designated bins without human intervention. A camera captures each brick as it passes; a neural network classifies it in real time; the sorting mechanism deflects it into the correct container.
-
-The system addresses a practical problem: manual sorting of bulk LEGO sets is slow, error-prone, and labour-intensive. This solution reduces sorting time by an estimated order of magnitude and produces a machine-readable Bill of Materials (BOM) as a by-product, enabling inventory tracking and set completion analysis.
+Аппаратно-программный комплекс для идентификации и сортировки деталей LEGO DUPLO в реальном времени на основе компьютерного зрения.
 
 ---
 
-## Architecture
+## О проекте
+
+Система решает практическую задачу: сортировка рассыпных наборов LEGO DUPLO вручную трудоёмка и ненадёжна. Предлагаемое решение автоматически определяет тип и цвет каждой детали на конвейерной ленте и направляет её в соответствующий контейнер.
+
+Деталь попадает в поле зрения камеры, нейронная сеть выполняет детекцию и классификацию за один проход, результат передаётся исполнительному механизму через HTTP API. Параллельно формируется машиночитаемая ведомость комплектации (BOM), позволяющая вести инвентаризацию и анализировать наборы.
+
+**Производительность:** 1 деталь / 5 с → 720 деталей / час → 5 760 деталей за рабочую смену.
+
+---
+
+## Архитектура системы
 
 ```
-Android App  ──HTTP──►  Raspberry Pi 5 (inference server)
-                              │
-                    ┌─────────┴──────────┐
-                    │                    │
-               YOLO v11            Arduino Uno × 4
-               (classifier)       (motor controllers)
-                                        │
-                          ┌─────────────┼──────────────┐
-                        Conveyor     Servo          IR Sensors
-                         Belt      (deflector)
+Android-приложение  ──HTTP──►  Raspberry Pi 5  (сервер вывода)
+                                      │
+                          ┌───────────┴────────────┐
+                     YOLOv11 (детекция)        Arduino Uno × 4
+                     + HSV-детектор цвета      (управление моторами)
+                                                    │
+                                   ┌────────────────┼─────────────────┐
+                               Конвейер          Сервопривод      ИК-датчики
+                               (подача)          (дефлектор)      (триггер)
 ```
 
-| Component | Quantity | Role |
-|-----------|----------|------|
-| Raspberry Pi 5 | 1 | Central controller, runs inference server, exposes HTTP API |
-| Arduino Uno | 4 | Low-level motor and servo control via UART/USB |
-| Conveyor motors | 3 | Belt drive, consistent feed rate |
-| Servo MG996R | 1 | Deflector gate, routes brick to target bin |
-| IR sensors | 4 | Brick presence detection, trigger capture |
-| Android device | 1 | Operator UI, displays classification results and BOM |
+| Компонент | Кол-во | Роль |
+|-----------|--------|------|
+| Raspberry Pi 5 | 1 | Центральный контроллер, инференс, HTTP API |
+| Arduino Uno | 4 | Управление моторами и сервоприводами по UART/USB |
+| Двигатели конвейера | 3 | Привод ленты, постоянная скорость подачи |
+| Сервопривод MG996R | 1 | Дефлекторный шлюз, направляет деталь в бин |
+| ИК-датчики | 4 | Детектирование присутствия детали, запуск захвата |
+| Android-устройство | 1 | Операторский интерфейс, отображение BOM |
 
-**Conveyor geometry:** V-groove at 45° centres bricks laterally before the camera zone. Belt speed ~30 cm/s; camera field of view 20 × 20 cm; sorting window 5–8 cm.
+**Геометрия механики:** V-образный желоб под 45° центрирует деталь перед камерной зоной. Скорость ленты ~30 см/с; поле зрения камеры 20 × 20 см; рабочее окно сортировки 5–8 см.
 
 ---
 
-## Machine Learning Pipeline
+## Что реализовано
 
-### Dataset
+### `app.py` — сервер реального времени
 
-- ~2 000 labelled photographs of LEGO DUPLO bricks
-- Sources: own captures under controlled lighting + synthetic renders from 3D models
-- Annotation format: bounding box + class label (brick type)
-- Augmentation: rotation, brightness jitter, background substitution
+Flask-приложение, предоставляющее MJPEG-стрим с аннотациями детекции в браузер. Ключевые решения:
 
-### Model
+- **Двухпоточная архитектура** — поток-граббер непрерывно читает кадры с IP-камеры (IP Webcam, MJPEG), поток-инференс обрабатывает только актуальный кадр, не накапливая очередь.
+- **Детектор цвета** — HSV-анализ региона интереса (ROI) дополняет метку типа детали цветовым суффиксом (`3011_red`, `3437_yellow` и т. д.), не нагружая нейронную сеть.
+- **Потоковый вывод** — маршрут `/stream.mjpg` отдаёт аннотированные кадры с настраиваемой шириной и качеством JPEG.
+- **REST-управление** — `POST /start` и `POST /stop` запускают и останавливают конвейер без перезапуска сервера.
 
-**YOLOv11** — chosen for real-time single-pass detection and classification. Training target: ≥ 80% mAP on the validation split, rising to ≥ 95% after full dataset expansion.
-
-Inference runs on Raspberry Pi 5; the model is exported to ONNX for deployment. The Android app sends a JPEG frame via HTTP POST and receives a JSON response containing detected class, confidence, and part ID.
-
-### BOM Generation
-
-Each classification event writes a record to a local database:
 ```
-{ part_id, part_name, colour, quantity, timestamp }
+GET  /             → веб-интерфейс (HTML)
+POST /start        → запуск инференса и захвата
+POST /stop         → остановка
+GET  /stream.mjpg  → MJPEG-стрим с детекцией
 ```
-The accumulated records form a Bill of Materials exportable as JSON or CSV, compatible with LEGO's own part taxonomy.
+
+### `train.py` — обучение модели
+
+Скрипт дообучения YOLOv11m на пользовательском датасете. Параметры: `imgsz=640`, `batch=8`, `epochs=100`. Обучение выполнялось на Apple Silicon (MPS) с экспортом модели в `.pt`.
+
+### `predict.py` — автономный инференс
+
+Скрипт для проверки модели на статичных изображениях. Включает ту же логику HSV-детектора цвета для валидации классификации вне основного пайплайна.
+
+### `dataset_custom.yaml` — конфигурация датасета
+
+14 классов деталей LEGO DUPLO (по номерам деталей из каталога LEGO):
+
+```
+2300, 2301, 2302, 3011, 31110, 3437, 4066,
+40666, 44524, 4672, 6474, 93353, 98223, 98233
+```
 
 ---
 
-## Performance
+## Применяемые инструменты и технологии
 
-| Metric | Value |
-|--------|-------|
-| Throughput | 1 brick / 5 s |
-| Per minute | 12 bricks |
-| Per hour | 720 bricks |
-| Per 8-hour shift | 5 760 bricks |
-
----
-
-## Current Status
-
-The repository is at the **initial stage**. The following has been completed:
-
-- [x] Technical specification finalised
-- [x] Component list and budget approved (~79 500 RUB)
-- [x] 3D model of the machine (Blender)
-- [x] Reference image set for DUPLO bricks collected
-- [x] LEGO brick ID dictionary prepared (`Lego_bricks.xlsx`)
-- [ ] Dataset labelling and augmentation
-- [ ] YOLOv11 training and validation
-- [ ] Raspberry Pi inference server
-- [ ] Arduino motor control firmware
-- [ ] Android application
-- [ ] End-to-end integration and field testing
-
-**Timeline:** February 2 – April 30, 2026 (4 sprints).
+| Инструмент | Версия / Описание |
+|------------|-------------------|
+| YOLOv11m | Ultralytics — детекция и классификация за один проход |
+| OpenCV | Захват видео, HSV-анализ, аннотация кадров |
+| Flask | HTTP API и MJPEG-стрим |
+| NumPy | Векторные операции над ROI |
+| Python 3.10+ | Основной язык разработки |
+| Arduino C++ | Прошивка управления двигателями (в разработке) |
 
 ---
 
-## Skills Applied in This Project
+## Используемые Claude Code скиллы
 
-The following Claude Code skills are used across the development lifecycle. Skills marked *(planned)* are not yet invoked but defined for upcoming phases.
+В процессе разработки применяется набор инструментов Claude Code, закрывающих различные этапы жизненного цикла проекта.
 
-### `/tz` — Technical Specification
+### `/tz` — Техническое задание
 
-Generates structured TZ documents from informal descriptions. Used to formalise hardware requirements, define acceptance criteria per sprint, and produce the component specification table.
+Генерирует структурированное ТЗ из неформального описания задачи. Применялся для формализации требований к аппаратной части, определения критериев приёмки по спринтам и составления спецификации компонентов.
 
-### `/plan` — Project Calendar
+### `/plan` — Календарный план
 
-Produces a sprint-by-sprint calendar with hour estimates per role. Used to allocate effort across ML engineer, embedded developer, and Android developer tracks.
+Составляет план спринтов с оценкой трудозатрат по ролям. Использовался для распределения работ между направлениями: ML-инженер, embedded-разработчик, Android-разработчик.
 
-### `/ocenka` — Complexity Assessment
+### `/ocenka` — Оценка сложности
 
-Evaluates project difficulty across five axes: technical complexity, scope, uncertainty, integrations, and team. Used at project kickoff to identify the ML pipeline and hardware integration as the highest-risk areas.
+Оценивает проект по пяти осям: техническая сложность, объём, неопределённость, интеграции, команда. Применялся на старте для идентификации ML-пайплайна и аппаратной интеграции как зон наибольшего риска.
 
-### `/pdf-to-md` — Document Conversion *(planned)*
+### `/pdf-to-md` — Конвертация документов
 
-Converts datasheets (Arduino pinouts, RPi GPIO reference, servo specs) from PDF to Markdown for inline reference during development.
+Переводит PDF-даташиты (распиновка Arduino, GPIO Raspberry Pi, характеристики сервоприводов) в Markdown для встроенного использования в документации.
 
-### `/preza` — Presentation Generation *(planned)*
+### `/preza` — Генерация презентаций *(запланировано)*
 
-Generates Reveal.js HTML slide decks from project notes. Planned for Sprint 4 final demo and academic defence.
+Создаёт HTML-презентации (Reveal.js) из проектных заметок. Запланировано для итогового демо в Спринте 4 и академической защиты.
 
-### `/img` — Image Generation *(planned)*
+### `/img` — Генерация изображений *(запланировано)*
 
-Generates synthetic training data: brick renders on varied backgrounds, different lighting conditions, orientations. Supplements the physical photo dataset.
+Генерирует синтетические тренировочные данные: рендеры деталей на вариативных фонах, при разных условиях освещения и углах поворота, как дополнение к физическому датасету.
 
-### `/klientu` — Client Communication *(planned)*
+### `/klientu` — Профессиональные сообщения *(запланировано)*
 
-Converts informal progress updates into professional reports suitable for academic supervisors and course reviewers.
-
----
-
-## How Claude Code Accelerates Development
-
-Claude Code is used as an active development partner across three dimensions:
-
-**1. Architecture and design.** At the outset, Claude Code analysed the sorting problem and proposed the current architecture: separating inference (Python on RPi) from motor control (C++ on Arduino) and exposing a clean HTTP boundary between hardware and UI. This decomposition reduced integration risk substantially.
-
-**2. Code generation and review.** Claude Code writes and reviews:
-- YOLOv11 training scripts (dataset loading, augmentation pipeline, export to ONNX)
-- Arduino firmware for conveyor timing and servo deflection logic
-- Raspberry Pi API server (Flask/FastAPI endpoint receiving frames, returning JSON)
-- Android HTTP client and BOM display UI
-
-**3. Structured documentation.** TZ, component lists, sprint plans, and this README were produced with Claude Code skills (`/tz`, `/plan`). This keeps documentation consistent with the code and eliminates the gap between specification and implementation.
-
-The workflow is: describe intent in plain language → Claude Code produces a concrete artefact (code, document, or diagram) → developer reviews and refines. Iteration cycles that would take hours are compressed to minutes.
+Преобразует неформальные сводки о прогрессе в корректные отчёты для научного руководителя и рецензентов курса.
 
 ---
 
-## Repository Structure
+## Роль Claude Code в разработке
+
+Claude Code задействован как активный участник разработки по трём направлениям.
+
+**Архитектура и проектирование.** На начальном этапе Claude Code проанализировал задачу сортировки и предложил текущую архитектуру: вынесение инференса (Python на RPi) и управления моторами (C++ на Arduino) в отдельные слои с чистым HTTP-интерфейсом между аппаратной частью и UI. Такое разделение существенно снизило риски интеграции.
+
+**Генерация и ревью кода.** Claude Code участвует в написании и проверке:
+- скриптов обучения YOLOv11 (загрузка датасета, аугментация, экспорт в ONNX);
+- прошивки Arduino для управления конвейером и временно́й логики дефлектора;
+- серверной части на Raspberry Pi (Flask/FastAPI, приём кадров, возврат JSON);
+- HTTP-клиента Android-приложения и интерфейса отображения BOM.
+
+**Структурированная документация.** ТЗ, список компонентов, план спринтов и этот README подготовлены с применением скиллов Claude Code (`/tz`, `/plan`). Это обеспечивает согласованность документации с кодом и устраняет разрыв между спецификацией и реализацией.
+
+Типичный рабочий цикл: описать намерение на естественном языке → Claude Code генерирует конкретный артефакт (код, документ, диаграмму) → разработчик проверяет и уточняет. Итерации, требующие часов, сжимаются до минут.
+
+---
+
+## Структура репозитория
 
 ```
 LegoProject/
-├── README.md           ← this file
-├── ml/                 ← dataset, training scripts, model weights
-├── firmware/           ← Arduino C++ sketches (conveyor, servo, sensors)
-├── server/             ← Raspberry Pi inference server (Python)
-├── android/            ← Android application
-└── docs/               ← TZ, BOM schema, sprint reports
+├── README.md              ← описание проекта
+├── app.py                 ← Flask-сервер: MJPEG-стрим + YOLOv11 + HSV-цвет
+├── train.py               ← дообучение YOLOv11m на датасете DUPLO
+├── predict.py             ← автономный инференс на статичных изображениях
+├── dataset_custom.yaml    ← конфигурация датасета: 14 классов DUPLO
+└── .gitignore             ← исключения: веса, данные, артефакты обучения
 ```
-
-*(Directories will be populated as development progresses.)*
 
 ---
 
-## References
+## Текущий статус
 
-- [YOLOv11 Documentation](https://docs.ultralytics.com)
-- [Raspberry Pi 5 Datasheet](https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-product-brief.pdf)
-- [Arduino Uno R3 Reference](https://docs.arduino.cc/hardware/uno-rev3/)
-- [LEGO Part Taxonomy](https://rebrickable.com/parts/)
+| Этап | Статус |
+|------|--------|
+| Техническое задание | ✅ Завершено |
+| Спецификация компонентов и бюджет (~79 500 руб.) | ✅ Завершено |
+| 3D-модель машины (Blender) | ✅ Завершено |
+| Сбор референсных изображений | ✅ Завершено |
+| Словарь деталей LEGO (BOM-словарь) | ✅ Завершено |
+| Обучение YOLOv11 (14 классов DUPLO) | ✅ Завершено |
+| Сервер реального времени (Flask + MJPEG) | ✅ Завершено |
+| Прошивка Arduino | 🔄 В разработке |
+| Android-приложение | 🔄 В разработке |
+| Сквозное интеграционное тестирование | ⏳ Запланировано |
+
+**Дедлайн:** 30 апреля 2026 года.
+
+---
+
+## Ссылки
+
+- [Документация YOLOv11 (Ultralytics)](https://docs.ultralytics.com)
+- [Raspberry Pi 5](https://datasheets.raspberrypi.com/rpi5/raspberry-pi-5-product-brief.pdf)
+- [Arduino Uno R3](https://docs.arduino.cc/hardware/uno-rev3/)
+- [Каталог деталей LEGO (Rebrickable)](https://rebrickable.com/parts/)
