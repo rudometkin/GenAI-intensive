@@ -9,6 +9,9 @@ allowedTools:
 
 # GitHub + Vercel Deploy
 
+> **Скилл для дополнительного балла (оценка 5)**
+> Покрывает полный production-цикл: от локального кода до живого сайта с автодеплоем — включая работу с несколькими аккаунтами, токенами и типичными ошибками Vercel.
+
 Полный цикл: локальный проект → GitHub репозиторий → живой сайт на Vercel.
 
 ---
@@ -164,16 +167,13 @@ vercel ls
 
 После первичной настройки каждый `git push origin main` автоматически запускает новый деплой на Vercel. Ничего делать не нужно.
 
-Для просмотра статуса деплоя:
 ```bash
-vercel ls
+vercel ls  # посмотреть статус последних деплоев
 ```
 
 ---
 
 ## Если нужно пушить от другого аккаунта
-
-Ситуация: локальный git настроен на один аккаунт, а пушить нужно в репозиторий другого пользователя.
 
 ```bash
 # Поменять имя и email для текущего репозитория
@@ -184,45 +184,36 @@ git config user.email "EMAIL@example.com"
 git remote set-url origin https://USERNAME:TOKEN@github.com/USERNAME/REPO.git
 ```
 
-Получить токен: GitHub → Settings → Developer settings → Personal access tokens → Generate new token → выбрать scope `repo`.
+Получить токен: GitHub → Settings → Developer settings → Personal access tokens → Generate new token → scope `repo`.
 
 ---
 
 ## Обновить переменную окружения на проде
 
 ```bash
-# Через CLI
 vercel env rm ANTHROPIC_API_KEY production
 vercel env add ANTHROPIC_API_KEY production
-
-# Передеплоить
 vercel --prod
 ```
 
-Или через сайт: Vercel → Settings → Environment Variables → Edit.
-
-После смены ключа Next.js dev-сервер кэширует `.env.local` — нужно подождать сообщения `Reload env: .env.local` в терминале.
+После смены ключа в `.env.local` ждать сообщения `Reload env: .env.local` в терминале — только тогда новый ключ применён.
 
 ---
 
 ## Типичные ошибки
 
 **`Module not found` при деплое на Vercel**
-Библиотека требует Node.js runtime, но Vercel запускает в Edge. Решение:
+Библиотека требует Node.js runtime. Решение:
 ```ts
-// route.ts
-export const runtime = "nodejs";
-```
-```ts
-// next.config.ts
-serverExternalPackages: ["название-библиотеки"]
+export const runtime = "nodejs"; // route.ts
+serverExternalPackages: ["название-библиотеки"] // next.config.ts
 ```
 
 **`Permission denied` при пуше**
-Токен не имеет прав на репозиторий. Проверить: токен создан с scope `repo`, пользователь добавлен как коллаборатор.
+Токен не имеет прав на репозиторий. Проверить: scope `repo`, пользователь добавлен как коллаборатор.
 
 **Переменная окружения не подхватывается**
-После добавления переменной в Vercel нужен новый деплой. Просто сохранить недостаточно.
+После добавления переменной в Vercel нужен новый деплой.
 
 **`fatal: not a git repository`**
 Команда выполняется не из папки проекта. Сначала `cd /путь/к/проекту`.
